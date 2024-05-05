@@ -6,7 +6,7 @@
 #include <rclcpp/logging.hpp>
 #include <rclcpp/qos.hpp>
 #include <rclcpp/utilities.hpp>
-#include </home/wyt/Downloads/ros2_humble/src/transport_drivers-humble/serial_driver/include/serial_driver/serial_driver.hpp>
+#include <serial_driver/serial_driver.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 // C++ system
@@ -70,13 +70,10 @@ RMSerialDriver::RMSerialDriver(const rclcpp::NodeOptions & options)
   aiming_point_.lifetime = rclcpp::Duration::from_seconds(0.1);
 
   // Create Subscription
-  target_sub_ = this->create_subscription<auto_aim_interfaces::msg::Aim>(
-    "/target", rclcpp::SensorDataQoS(),
+  target_sub_ = this->create_subscription<auto_aim_interfaces::msg::Target>(
+    "/tracker/target", rclcpp::SensorDataQoS(),
     std::bind(&RMSerialDriver::sendData, this, std::placeholders::_1));
-  armor_sub_ = this->create_subscription<auto_aim_interfaces::msg::Armors>(
-    "/detector/armors", rclcpp::SensorDataQoS(),
-    std::bind(&RMSerialDriver::armorCB, this, std::placeholders::_1));
-    }
+}
 
 RMSerialDriver::~RMSerialDriver()
 {
@@ -117,7 +114,7 @@ void RMSerialDriver::receiveData()
             setParam(rclcpp::Parameter("detect_color", packet.detect_color));
             previous_receive_color_ = packet.detect_color;
           }
-          packet.reset_tracker = false;
+
           if (packet.reset_tracker) {
             resetTracker();
           }
@@ -127,10 +124,8 @@ void RMSerialDriver::receiveData()
           t.header.stamp = this->now() + rclcpp::Duration::from_seconds(timestamp_offset_);
           t.header.frame_id = "odom";
           t.child_frame_id = "gimbal_link";
-          pitch_ = -packet.pitch;
-          yaw_ = -packet.yaw;
           tf2::Quaternion q;
-          q.setRPY(packet.roll/180*3.1415, (-packet.pitch)/180*3.1415, (-packet.yaw)/180*3.1415);
+          q.setRPY(packet.roll, packet.pitch, packet.yaw);
           t.transform.rotation = tf2::toMsg(q);
           tf_broadcaster_->sendTransform(t);
 
@@ -155,18 +150,7 @@ void RMSerialDriver::receiveData()
   }
 }
 
-void RMSerialDriver::armorCB(const auto_aim_interfaces::msg::Armors::SharedPtr armors_msg)
-{
-  // for(int  i = 0; i <= 3; i++) {
-  //     if(armors_msg->armors[i].pose.position.x < 0.07)
-  //     {
-  //       // armor_time = armors_msg->header;
-  //       auto_shoot = true;
-  //     }
-  // }
-}
-
-void RMSerialDriver::sendData(const auto_aim_interfaces::msg::Aim::SharedPtr msg)
+void RMSerialDriver::sendData(const auto_aim_interfaces::msg::Target::SharedPtr msg)
 {
   const static std::map<std::string, uint8_t> id_unit8_map{
     {"", 0},  {"outpost", 0}, {"1", 1}, {"1", 1},     {"2", 2},
@@ -174,44 +158,20 @@ void RMSerialDriver::sendData(const auto_aim_interfaces::msg::Aim::SharedPtr msg
 
   try {
     SendPacket packet;
-    // packet.tracking = msg->tracking;
-    // packet.id = id_unit8_map.at(msg->id);
-    // packet.armors_num = msg->armors_num;
-    // packet.x = msg->position.x;
-    // packet.y = msg->position.y;
-    // packet.z = msg->position.z;
-    // packet.yaw = msg->yaw;
-    // packet.vx = msg->velocity.x;
-    // packet.vy = msg->velocity.y;
-    // packet.vz = msg->velocity.z;
-    // packet.v_yaw = msg->v_yaw;
-    // packet.r1 = msg->radius_1;
-    // packet.r2 = msg->radius_2;
-    // packet.dz = msg->dz;
-    
-    packet.enemy = msg->enemy;
-    packet.pitch = msg->pitch_angle - pitch_;
-        // packet.pitch = 14;
-    packet.yaw = msg->yaw_angle - yaw_;
-
-      // if(msg->yaw * 0.13 < 0.07)  aim_msg.auto_shoot = true;
-      // if(msg->v_yaw > 10) aim_msg.auto_shoot = true;
-      // packet.auto_shoot = false;
-
-        // packet.yaw = 23;
-    // packet.auto_aim = msg->auto_shoot;
-
-    // packet.auto_aim = false;
-    // if(armor_dit < 0.07) 
-    // packet.auto_aim = true;
-    // else packet.auto_aim = false;
-
-    // msg->header == armor_time &&
-    // if( auto_shoot ) packet.auto_aim = true;
-    // else packet.auto_aim = false;
-    if(packet.yaw <= 0.6 && packet.yaw >= -0.6)packet.auto_aim = true;
-    else packet.auto_aim =false;
-    printf("main yaw:%f° ", packet.yaw);
+    packet.tracking = msg->tracking;
+    packet.id = id_unit8_map.at(msg->id);
+    packet.armors_num = msg->armors_num;
+    packet.x = msg->position.x;
+    packet.y = msg->position.y;
+    packet.z = msg->position.z;
+    packet.yaw = msg->yaw;
+    packet.vx = msg->velocity.x;
+    packet.vy = msg->velocity.y;
+    packet.vz = msg->velocity.z;
+    packet.v_yaw = msg->v_yaw;
+    packet.r1 = msg->radius_1;
+    packet.r2 = msg->radius_2;
+    packet.dz = msg->dz;
     crc16::Append_CRC16_Check_Sum(reinterpret_cast<uint8_t *>(&packet), sizeof(packet));
 
     std::vector<uint8_t> data = toVector(packet);
@@ -219,7 +179,7 @@ void RMSerialDriver::sendData(const auto_aim_interfaces::msg::Aim::SharedPtr msg
     serial_driver_->port()->send(data);
 
     std_msgs::msg::Float64 latency;
-    // latency.data = (this->now() - msg->header.stamp).seconds() * 1000.0;
+    latency.data = (this->now() - msg->header.stamp).seconds() * 1000.0;
     RCLCPP_DEBUG_STREAM(get_logger(), "Total latency: " + std::to_string(latency.data) + "ms");
     latency_pub_->publish(latency);
   } catch (const std::exception & ex) {

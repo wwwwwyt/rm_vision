@@ -10,7 +10,7 @@
 #include <rclcpp/publisher.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp/subscription.hpp>
-#include </home/wyt/Downloads/ros2_humble/src/transport_drivers-humble/serial_driver/include/serial_driver/serial_driver.hpp>
+#include <serial_driver/serial_driver.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_srvs/srv/trigger.hpp>
 #include <visualization_msgs/msg/marker.hpp>
@@ -22,10 +22,8 @@
 #include <thread>
 #include <vector>
 
-#include "auto_aim_interfaces/msg/aim.hpp"
-#include "auto_aim_interfaces/msg/armors.hpp"
+#include "auto_aim_interfaces/msg/target.hpp"
 
-using namespace std;
 namespace rm_serial_driver
 {
 class RMSerialDriver : public rclcpp::Node
@@ -35,16 +33,12 @@ public:
 
   ~RMSerialDriver() override;
 
-  float pitch_;
-  float yaw_;
-    void receiveData();
-    void sendData(auto_aim_interfaces::msg::Aim::SharedPtr msg);
-    void armorCB(const auto_aim_interfaces::msg::Armors::SharedPtr armors_msg);
 private:
-
   void getParams();
 
+  void receiveData();
 
+  void sendData(auto_aim_interfaces::msg::Target::SharedPtr msg);
 
   void reopenPort();
 
@@ -58,8 +52,6 @@ private:
   std::unique_ptr<drivers::serial_driver::SerialPortConfig> device_config_;
   std::unique_ptr<drivers::serial_driver::SerialDriver> serial_driver_;
 
-  // message_filters::Subscriber<auto_aim_interfaces::msg::Armors> armor_sub_;
-  int armor_dit{10};
   // Param client to set detect_colr
   using ResultFuturePtr = std::shared_future<std::vector<rcl_interfaces::msg::SetParametersResult>>;
   bool initial_set_param_ = false;
@@ -77,15 +69,13 @@ private:
   double timestamp_offset_ = 0;
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
-  rclcpp::Subscription<auto_aim_interfaces::msg::Aim>::SharedPtr target_sub_;
-  rclcpp::Subscription<auto_aim_interfaces::msg::Armors>::SharedPtr armor_sub_;
+  rclcpp::Subscription<auto_aim_interfaces::msg::Target>::SharedPtr target_sub_;
+
   // For debug usage
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr latency_pub_;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr marker_pub_;
 
   std::thread receive_thread_;
-  // std_msgs/Header armor_time{0};
-  bool auto_shoot {false} ;
 };
 }  // namespace rm_serial_driver
 
