@@ -54,7 +54,7 @@ include_directories(
 
 
 add_executable(ahrs_driver_node src/ahrs_driver.cpp src/crc_table.cpp)
-ament_target_dependencies(ahrs_driver_node rclcpp rclpy  std_msgs  sensor_msgs  serial tf2_ros tf2 nav_msgs geometry_msgs)
+ament_target_dependencies(ahrs_driver_node rclcpp rclpy  std_msgs  sensor_msgs  serial tf2_ros tf2 nav_msgs geometry_msgs tf2_geometry_msgs)
 
 
 add_executable(imu_tf_node src/imu_tf.cpp)

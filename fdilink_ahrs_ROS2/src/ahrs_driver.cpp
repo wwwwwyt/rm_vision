@@ -58,6 +58,10 @@ ahrsBringup::ahrsBringup()
   //pravite_nh.param("port", serial_port_, std::string("/dev/ttyTHS1")); 
   //pravite_nh.param("baud", serial_baud_, 115200);
   
+  // TF broadcaster
+  timestamp_offset_ = this->declare_parameter("timestamp_offset", 0.0);
+  tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+
   //publisher
   imu_pub_ = create_publisher<sensor_msgs::msg::Imu>(imu_topic.c_str(), 10);
   gps_pub_ = create_publisher<sensor_msgs::msg::NavSatFix>(gps_topic.c_str(), 10);
@@ -507,6 +511,16 @@ void ahrsBringup::processLoop()  // 数据处理过程
       Magnetic.x = imu_frame_.frame.data.data_pack.magnetometer_x;
       Magnetic.y = imu_frame_.frame.data.data_pack.magnetometer_y;
       Magnetic.z = imu_frame_.frame.data.data_pack.magnetometer_z;
+
+      geometry_msgs::msg::TransformStamped t;
+      timestamp_offset_ = this->get_parameter("timestamp_offset").as_double();
+      t.header.stamp = this->now() + rclcpp::Duration::from_seconds(timestamp_offset_);
+      t.header.frame_id = "odom";
+      t.child_frame_id = "gimbal_link";
+      tf2::Quaternion q;
+      q.setRPY(ahrs_frame_.frame.data.data_pack.Roll, ahrs_frame_.frame.data.data_pack.Pitch, ahrs_frame_.frame.data.data_pack.Heading);
+      t.transform.rotation = tf2::toMsg(q);
+      tf_broadcaster_->sendTransform(t);
 
       Euler_angles_pub_->publish(Euler_angles_2d);
       Magnetic_pub_->publish(Magnetic);

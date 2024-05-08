@@ -45,29 +45,29 @@ def generate_launch_description():
         )
 
     hik_camera_node = get_camera_node('hik_camera', 'hik_camera::HikCameraNode')
-    mv_camera_node = get_camera_node('mindvision_camera', 'mindvision_camera::MVCameraNode')
+    # mv_camera_node = get_camera_node('mindvision_camera', 'mindvision_camera::MVCameraNode')
 
-    if (launch_params['camera'] == 'hik'):
-        cam_detector = get_camera_detector_container(hik_camera_node)
-    elif (launch_params['camera'] == 'mv'):
-        cam_detector = get_camera_detector_container(mv_camera_node)
+    # if (launch_params['ca/mera'] == 'hik'):
+    cam_detector = get_camera_detector_container(hik_camera_node)
+    # elif (launch_params['camera'] == 'mv'):
+    #     cam_detector = get_camera_detector_container(mv_camera_node)
 
-    serial_driver_node = Node(
-        package='rm_serial_driver',
-        executable='rm_serial_driver_node',
-        name='serial_driver',
-        output='both',
-        emulate_tty=True,
-        parameters=[node_params],
-        on_exit=Shutdown(),
-        ros_arguments=['--ros-args', '--log-level',
-                       'serial_driver:='+launch_params['serial_log_level']],
-    )
+    # serial_driver_node = Node(
+    #     package='rm_serial_driver',
+    #     executable='rm_serial_driver_node',
+    #     name='serial_driver',
+    #     output='both',
+    #     emulate_tty=True,
+    #     parameters=[node_params],
+    #     on_exit=Shutdown(),
+    #     ros_arguments=['--ros-args', '--log-level',
+    #                    'serial_driver:='+launch_params['serial_log_level']],
+    # )
 
-    delay_serial_node = TimerAction(
-        period=1.5,
-        actions=[serial_driver_node],
-    )
+    # delay_serial_node = TimerAction(
+    #     period=1.5,
+    #     actions=[serial_driver_node],
+    # )
 
     delay_tracker_node = TimerAction(
         period=2.0,
@@ -77,6 +77,6 @@ def generate_launch_description():
     return LaunchDescription([
         robot_state_publisher,
         cam_detector,
-        delay_serial_node,
+        # delay_serial_node,
         delay_tracker_node,
     ])
