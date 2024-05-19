@@ -518,7 +518,7 @@ void ahrsBringup::processLoop()  // 数据处理过程
       t.header.frame_id = "odom";
       t.child_frame_id = "gimbal_link";
       tf2::Quaternion q;
-      q.setRPY(ahrs_frame_.frame.data.data_pack.Roll, ahrs_frame_.frame.data.data_pack.Pitch, ahrs_frame_.frame.data.data_pack.Heading);
+      q.setRPY(ahrs_frame_.frame.data.data_pack.Roll, ahrs_frame_.frame.data.data_pack.Pitch, -ahrs_frame_.frame.data.data_pack.Heading);
       t.transform.rotation = tf2::toMsg(q);
       tf_broadcaster_->sendTransform(t);
 

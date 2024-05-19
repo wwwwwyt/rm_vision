@@ -50,7 +50,7 @@ RMSerialDriver::RMSerialDriver(const rclcpp::NodeOptions & options)
     serial_driver_->init_port(device_name_, *device_config_);
     if (!serial_driver_->port()->is_open()) {
       serial_driver_->port()->open();
-      receive_thread_ = std::thread(&RMSerialDriver::receiveData, this);
+      // receive_thread_ = std::thread(&RMSerialDriver::receiveData, this);
     }
   } catch (const std::exception & ex) {
     RCLCPP_ERROR(
