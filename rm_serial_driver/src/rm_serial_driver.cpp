@@ -50,7 +50,7 @@ RMSerialDriver::RMSerialDriver(const rclcpp::NodeOptions & options)
     serial_driver_->init_port(device_name_, *device_config_);
     if (!serial_driver_->port()->is_open()) {
       serial_driver_->port()->open();
-      // receive_thread_ = std::thread(&RMSerialDriver::receiveData, this);
+      receive_thread_ = std::thread(&RMSerialDriver::receiveData, this);
     }
   } catch (const std::exception & ex) {
     RCLCPP_ERROR(
@@ -92,62 +92,64 @@ RMSerialDriver::~RMSerialDriver()
 
 void RMSerialDriver::receiveData()
 {
-  // std::vector<uint8_t> header(1);
-  // std::vector<uint8_t> data;
-  // data.reserve(sizeof(ReceivePacket));
+  if (!serial_driver_->port()->is_open()) 
+      serial_driver_->port()->open();
+  std::vector<uint8_t> header(1);
+  std::vector<uint8_t> data;
+  data.reserve(sizeof(ReceivePacket));
 
-  // while (rclcpp::ok()) {
-  //   try {
-  //     serial_driver_->port()->receive(header);
+  while (rclcpp::ok()) {
+    try {
+      serial_driver_->port()->receive(header);
 
-  //     if (header[0] == 0x5A) {
-  //       data.resize(sizeof(ReceivePacket) - 1);
-  //       serial_driver_->port()->receive(data);
+      if (header[0] == 0X05) {
+        data.resize(sizeof(ReceivePacket) - 1);
+        serial_driver_->port()->receive(data);
 
-  //       data.insert(data.begin(), header[0]);
-  //       ReceivePacket packet = fromVector(data);
+        data.insert(data.begin(), header[0]);
+        ReceivePacket packet = fromVector(data);
 
-  //       bool crc_ok =
-  //         crc16::Verify_CRC16_Check_Sum(reinterpret_cast<const uint8_t *>(&packet), sizeof(packet));
-  //       if (crc_ok) {
-  //         if (!initial_set_param_ || packet.detect_color != previous_receive_color_) {
-  //           setParam(rclcpp::Parameter("detect_color", packet.detect_color));
-  //           previous_receive_color_ = packet.detect_color;
-  //         }
+        bool crc_ok =
+          crc16::Verify_CRC16_Check_Sum(reinterpret_cast<const uint8_t *>(&packet), sizeof(packet));
+        if (crc_ok) {
+          if (!initial_set_param_ || packet.detect_color != previous_receive_color_) {
+            setParam(rclcpp::Parameter("detect_color", packet.detect_color));
+            previous_receive_color_ = packet.detect_color;
+          }
 
-  //         if (packet.reset_tracker) {
-  //           resetTracker();
-  //         }
+          // if (packet.reset_tracker) {
+          //   resetTracker();
+          // }
 
-  //         geometry_msgs::msg::TransformStamped t;
-  //         timestamp_offset_ = this->get_parameter("timestamp_offset").as_double();
-  //         t.header.stamp = this->now() + rclcpp::Duration::from_seconds(timestamp_offset_);
-  //         t.header.frame_id = "odom";
-  //         t.child_frame_id = "gimbal_link";
-  //         tf2::Quaternion q;
-  //         q.setRPY(packet.roll, packet.pitch, packet.yaw);
-  //         t.transform.rotation = tf2::toMsg(q);
-  //         tf_broadcaster_->sendTransform(t);
+          geometry_msgs::msg::TransformStamped t;
+          timestamp_offset_ = this->get_parameter("timestamp_offset").as_double();
+          t.header.stamp = this->now() + rclcpp::Duration::from_seconds(timestamp_offset_);
+          t.header.frame_id = "odom";
+          t.child_frame_id = "gimbal_link";
+          tf2::Quaternion q;
+          q.setRPY(packet.roll/180*3.1415926, packet.pitch/180*3.1415926, packet.yaw/180*3.1415926);
+          t.transform.rotation = tf2::toMsg(q);
+          tf_broadcaster_->sendTransform(t);
 
-  //         if (abs(packet.aim_x) > 0.01) {
-  //           aiming_point_.header.stamp = this->now();
-  //           aiming_point_.pose.position.x = packet.aim_x;
-  //           aiming_point_.pose.position.y = packet.aim_y;
-  //           aiming_point_.pose.position.z = packet.aim_z;
-  //           marker_pub_->publish(aiming_point_);
-  //         }
-  //       } else {
-  //         RCLCPP_ERROR(get_logger(), "CRC error!");
-  //       }
-  //     } else {
-  //       RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 20, "Invalid header: %02X", header[0]);
-  //     }
-  //   } catch (const std::exception & ex) {
-  //     RCLCPP_ERROR_THROTTLE(
-  //       get_logger(), *get_clock(), 20, "Error while receiving data: %s", ex.what());
-  //     reopenPort();
-  //   }
-  // }
+          if (abs(packet.aim_x) > 0.01) {
+            aiming_point_.header.stamp = this->now();
+            aiming_point_.pose.position.x = packet.aim_x;
+            aiming_point_.pose.position.y = packet.aim_y;
+            aiming_point_.pose.position.z = packet.aim_z;
+            marker_pub_->publish(aiming_point_);
+          }
+        } else {
+          RCLCPP_ERROR(get_logger(), "CRC error!");
+        }
+      } else {
+        RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 20, "Invalid header: %02X", header[0]);
+      }
+    } catch (const std::exception & ex) {
+      RCLCPP_ERROR_THROTTLE(
+        get_logger(), *get_clock(), 20, "Error while receiving data: %s", ex.what());
+      reopenPort();
+    }
+  }
 }
 
 void RMSerialDriver::sendData(const auto_aim_interfaces::msg::Target::SharedPtr msg)
