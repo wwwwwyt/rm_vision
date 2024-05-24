@@ -1,0 +1,12 @@
+[Unit]
+Description=wolf_control start
+After=network.target
+
+[Service]
+User=wolfvision
+ExecStart=/home/wolfvision/workspace/rm_ws/src/rm_vision/rm_vision_bringup/boot>
+WorkingDirectory=/home/wolfvision/workspace/rm_ws
+Type=simple
+
+[Install]
+WantedBy=multi-user.target
